@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio2Text — Telemetry Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --border: #30363d;
+            --text: #e6edf3;
+            --text-muted: #8b949e;
+            --accent: #58a6ff;
+            --green: #3fb950;
+            --red: #f85149;
+            --orange: #d29922;
+            --purple: #bc8cff;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        header h1 { font-size: 24px; font-weight: 600; }
+        header h1 span { color: var(--accent); }
+        .meta { color: var(--text-muted); font-size: 13px; text-align: right; }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .kpi-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .kpi-card .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .kpi-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+        .kpi-card .sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .chart-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .chart-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+        .chart-card canvas { max-height: 260px; }
+        .chart-card.full-width { grid-column: 1 / -1; }
+
+        .table-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .table-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; color: var(--text-muted); font-weight: 500; padding: 8px; border-bottom: 1px solid var(--border); }
+        td { padding: 8px; border-bottom: 1px solid var(--border); }
+        tr:last-child td { border-bottom: none; }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-high { background: rgba(248,81,73,0.2); color: var(--red); }
+        .badge-medium { background: rgba(210,153,34,0.2); color: var(--orange); }
+        .badge-clean { background: rgba(63,185,80,0.2); color: var(--green); }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><span>Audio2Text</span> Telemetry</h1>
+            <div class="meta">
+                <div id="generated-at"></div>
+                <div id="window-info"></div>
+            </div>
+        </header>
+        <div id="content"></div>
+    </div>
+
+    <script>
+    // Data is embedded at build time by generate_dashboard.py
+    const DASHBOARD_DATA = {
+  "generated_at": "2026-02-22T18:21:44Z",
+  "window_days": 30,
+  "summary": {
+    "total_machines": 4,
+    "total_sessions": 32,
+    "total_heartbeats": 35,
+    "total_duration_seconds": 4152974,
+    "total_usage": {
+      "recordings_created": 124,
+      "transcriptions_run": 85,
+      "diarizations_run": 0,
+      "ai_generations": 19,
+      "audio_imports_file": 3,
+      "audio_imports_youtube": 0,
+      "settings_changes": 0
+    }
+  },
+  "daily": [
+    {
+      "date": "2026-02-13",
+      "machines": 1,
+      "sessions": 6,
+      "heartbeats": 14,
+      "duration": 216,
+      "usage": {
+        "recordings_created": 2,
+        "transcriptions_run": 0,
+        "diarizations_run": 0,
+        "ai_generations": 5,
+        "audio_imports_file": 0,
+        "audio_imports_youtube": 0,
+        "settings_changes": 0
+      }
+    },
+    {
+      "date": "2026-02-14",
+      "machines": 1,
+      "sessions": 0,
+      "heartbeats": 1,
+      "duration": 0,
+      "usage": {}
+    },
+    {
+      "date": "2026-02-16",
+      "machines": 2,
+      "sessions": 4,
+      "heartbeats": 4,
+      "duration": 27694,
+      "usage": {
+        "recordings_created": 8,
+        "transcriptions_run": 3,
+        "diarizations_run": 0,
+        "ai_generations": 1,
+        "audio_imports_file": 0,
+        "audio_imports_youtube": 0,
+        "settings_changes": 0
+      }
+    },
+    {
+      "date": "2026-02-17",
+      "machines": 3,
+      "sessions": 2,
+      "heartbeats": 4,
+      "duration": 421249,
+      "usage": {
+        "recordings_created": 14,
+        "transcriptions_run": 14,
+        "diarizations_run": 0,
+        "ai_generations": 11,
+        "audio_imports_file": 0,
+        "audio_imports_youtube": 0,
+        "settings_changes": 0
+      }
+    },
+    {
+      "date": "2026-02-18",
+      "machines": 3,
+      "sessions": 10,
+      "heartbeats": 6,
+      "duration": 228194,
+      "usage": {
+        "recordings_created": 22,
+        "transcriptions_run": 22,
+        "diarizations_run": 0,
+        "ai_generations": 2,
+        "audio_imports_file": 0,
+        "audio_imports_youtube": 0,
+        "settings_changes": 0
+      }
+    },
+    {
+      "date": "2026-02-19",
+      "machines": 3,
+      "sessions": 5,
+      "heartbeats": 4,
+      "duration": 1405684,
+      "usage": {
+        "recordings_created": 26,
+        "transcriptions_run": 43,
+        "diarizations_run": 0,
+        "ai_generations": 0,
+        "audio_imports_file": 0,
+        "audio_imports_youtube": 0,
+        "settings_changes": 0
+      }
+    },
+    {
+      "date": "2026-02-20",
+      "machines": 2,
+      "sessions": 4,
+      "heartbeats": 2,
+      "duration": 1936222,
+      "usage": {
+        "recordings_created": 51,
+        "transcriptions_run": 3,
+        "diarizations_run": 0,
+        "ai_generations": 0,
+        "audio_imports_file": 3,
+        "audio_imports_youtube": 0,
+        "settings_changes": 0
+      }
+    },
+    {
+      "date": "2026-02-21",
+      "machines": 1,
+      "sessions": 1,
+      "heartbeats": 0,
+      "duration": 133715,
+      "usage": {
+        "recordings_created": 1,
+        "transcriptions_run": 0,
+        "diarizations_run": 0,
+        "ai_generations": 0,
+        "audio_imports_file": 0,
+        "audio_imports_youtube": 0,
+        "settings_changes": 0
+      }
+    }
+  ],
+  "feature_usage": {
+    "recordings_created": {
+      "users": 4,
+      "total_machines": 4,
+      "percentage": 100.0
+    },
+    "transcriptions_run": {
+      "users": 4,
+      "total_machines": 4,
+      "percentage": 100.0
+    },
+    "ai_generations": {
+      "users": 3,
+      "total_machines": 4,
+      "percentage": 75.0
+    },
+    "audio_imports_file": {
+      "users": 1,
+      "total_machines": 4,
+      "percentage": 25.0
+    }
+  },
+  "retention": {
+    "D1": {
+      "retained": 3,
+      "total": 4,
+      "percentage": 75.0
+    },
+    "D7": {
+      "retained": 0,
+      "total": 4,
+      "percentage": 0.0
+    },
+    "D30": {
+      "retained": 0,
+      "total": 4,
+      "percentage": 0.0
+    }
+  },
+  "license_abuse": {
+    "total_licenses": 5,
+    "alerts": [
+      {
+        "license_type": "expert",
+        "machine_count": 2,
+        "threshold": 1,
+        "severity": "MEDIUM"
+      }
+    ],
+    "clean_count": 4
+  },
+  "app_versions": {
+    "2.8.0": 71,
+    "2.11.0": 28,
+    "2.11.1": 19,
+    "2.7.2": 15,
+    "2.10.0": 10,
+    "test-2.7.2": 2,
+    "2.9.0": 2,
+    "test-shutdown": 1,
+    "test-persist": 1,
+    "test-debug-ssl": 1
+  },
+  "top_errors": [],
+  "machines": [
+    {
+      "os_version": "Windows-10-10.0.26100-SP0",
+      "app_version": "2.11.1",
+      "license_type": "PERSONAL",
+      "first_seen": "2026-02-16T08:58:12Z",
+      "last_seen": "2026-02-20T15:39:13Z"
+    },
+    {
+      "os_version": "Windows-10-10.0.22631-SP0",
+      "app_version": "2.11.1",
+      "license_type": "EXPERT",
+      "first_seen": "2026-02-13T22:35:13Z",
+      "last_seen": "2026-02-19T20:51:50Z"
+    },
+    {
+      "os_version": "Windows-10-10.0.26100-SP0",
+      "app_version": "2.11.0",
+      "license_type": "PERSONAL",
+      "first_seen": "2026-02-18T15:17:49Z",
+      "last_seen": "2026-02-19T13:44:29Z"
+    },
+    {
+      "os_version": "Windows-10-10.0.26100-SP0",
+      "app_version": "2.8.0",
+      "license_type": "EXPERT",
+      "first_seen": "2026-02-16T16:01:27Z",
+      "last_seen": "2026-02-16T16:12:16Z"
+    }
+  ]
+};
+
+    const COLORS = {
+        accent: '#58a6ff', green: '#3fb950', red: '#f85149',
+        orange: '#d29922', purple: '#bc8cff', pink: '#f778ba',
+    };
+    const CHART_COLORS = ['#58a6ff','#3fb950','#d29922','#f85149','#bc8cff','#f778ba','#79c0ff','#56d364'];
+
+    Chart.defaults.color = '#8b949e';
+    Chart.defaults.borderColor = '#30363d';
+    Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
+    Chart.defaults.font.size = 11;
+
+    function formatDuration(seconds) {
+        if (seconds < 60) return seconds + 's';
+        if (seconds < 3600) return Math.round(seconds / 60) + 'm';
+        return (seconds / 3600).toFixed(1) + 'h';
+    }
+    function formatDate(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+    }
+
+    function render(data) {
+        document.getElementById('generated-at').textContent =
+            'Updated: ' + new Date(data.generated_at).toLocaleString('fr-FR');
+        document.getElementById('window-info').textContent =
+            'Window: ' + data.window_days + ' days';
+
+        const s = data.summary;
+        const alertCount = data.license_abuse.alerts.length;
+
+        document.getElementById('content').innerHTML =
+            '<div class="kpi-grid">' +
+                kpiCard('Machines', s.total_machines, 'unique devices') +
+                kpiCard('Sessions', s.total_sessions, formatDuration(s.total_duration_seconds) + ' total') +
+                kpiCard('Heartbeats', s.total_heartbeats, 'startup pings') +
+                kpiCard('License Alerts', alertCount, alertCount > 0 ? 'needs attention' : 'all clean',
+                    alertCount > 0 ? COLORS.red : COLORS.green) +
+            '</div>' +
+            '<div class="charts-grid">' +
+                '<div class="chart-card full-width"><h3>Daily Activity</h3><canvas id="chart-activity"></canvas></div>' +
+                '<div class="chart-card"><h3>Feature Usage</h3><canvas id="chart-features"></canvas></div>' +
+                '<div class="chart-card"><h3>App Versions</h3><canvas id="chart-versions"></canvas></div>' +
+                '<div class="chart-card"><h3>Retention</h3><canvas id="chart-retention"></canvas></div>' +
+                '<div class="chart-card"><h3>Usage Breakdown</h3><canvas id="chart-usage"></canvas></div>' +
+            '</div>' +
+            '<div class="table-card" id="license-table"></div>' +
+            '<div class="table-card" id="machines-table"></div>' +
+            (data.top_errors.length > 0 ? '<div class="table-card" id="errors-table"></div>' : '');
+
+        renderActivityChart(data);
+        renderFeaturesChart(data);
+        renderVersionsChart(data);
+        renderRetentionChart(data);
+        renderUsageChart(data);
+        renderLicenseTable(data);
+        renderMachinesTable(data);
+        if (data.top_errors.length > 0) renderErrorsTable(data);
+    }
+
+    function kpiCard(label, value, sub, color) {
+        return '<div class="kpi-card">' +
+            '<div class="label">' + label + '</div>' +
+            '<div class="value"' + (color ? ' style="color:' + color + '"' : '') + '>' + value + '</div>' +
+            '<div class="sub">' + sub + '</div></div>';
+    }
+
+    function renderActivityChart(data) {
+        if (data.daily.length === 0) return;
+        new Chart(document.getElementById('chart-activity'), {
+            type: 'line',
+            data: {
+                labels: data.daily.map(function(d) { return formatDate(d.date); }),
+                datasets: [
+                    { label: 'Sessions', data: data.daily.map(function(d){return d.sessions;}),
+                      borderColor: COLORS.accent, backgroundColor: 'rgba(88,166,255,0.1)', fill: true, tension: 0.3 },
+                    { label: 'Machines', data: data.daily.map(function(d){return d.machines;}),
+                      borderColor: COLORS.green, backgroundColor: 'rgba(63,185,80,0.1)', fill: true, tension: 0.3 },
+                    { label: 'Heartbeats', data: data.daily.map(function(d){return d.heartbeats;}),
+                      borderColor: COLORS.purple, backgroundColor: 'rgba(188,140,255,0.1)', fill: true, tension: 0.3 },
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                scales: { y: { beginAtZero: true, grid: { color: '#21262d' } }, x: { grid: { display: false } } },
+                plugins: { legend: { position: 'top' } }
+            }
+        });
+    }
+
+    function renderFeaturesChart(data) {
+        var features = data.feature_usage;
+        var labels = Object.keys(features).map(function(k){return k.replace(/_/g,' ');});
+        var values = Object.values(features).map(function(v){return v.percentage;});
+        if (labels.length === 0) return;
+        new Chart(document.getElementById('chart-features'), {
+            type: 'bar',
+            data: { labels: labels, datasets: [{ label: '% of machines', data: values,
+                backgroundColor: CHART_COLORS.slice(0, labels.length), borderRadius: 4 }] },
+            options: { indexAxis: 'y', responsive: true,
+                scales: { x: { beginAtZero: true, max: 100, grid: { color: '#21262d' } }, y: { grid: { display: false } } },
+                plugins: { legend: { display: false } } }
+        });
+    }
+
+    function renderVersionsChart(data) {
+        var labels = Object.keys(data.app_versions);
+        var values = Object.values(data.app_versions);
+        if (labels.length === 0) return;
+        new Chart(document.getElementById('chart-versions'), {
+            type: 'doughnut',
+            data: { labels: labels, datasets: [{ data: values,
+                backgroundColor: CHART_COLORS.slice(0, labels.length), borderWidth: 0 }] },
+            options: { responsive: true, plugins: { legend: { position: 'right', labels: { boxWidth: 12 } } } }
+        });
+    }
+
+    function renderRetentionChart(data) {
+        var ret = data.retention;
+        var labels = Object.keys(ret);
+        var values = labels.map(function(k){return ret[k].percentage;});
+        new Chart(document.getElementById('chart-retention'), {
+            type: 'bar',
+            data: { labels: labels, datasets: [{ label: 'Retention %', data: values,
+                backgroundColor: [COLORS.green, COLORS.accent, COLORS.purple], borderRadius: 4 }] },
+            options: { responsive: true,
+                scales: { y: { beginAtZero: true, max: 100, grid: { color: '#21262d' } }, x: { grid: { display: false } } },
+                plugins: { legend: { display: false } } }
+        });
+    }
+
+    function renderUsageChart(data) {
+        var usage = data.summary.total_usage;
+        var labels = Object.keys(usage).map(function(k){return k.replace(/_/g,' ');});
+        var values = Object.values(usage);
+        if (labels.length === 0) return;
+        new Chart(document.getElementById('chart-usage'), {
+            type: 'bar',
+            data: { labels: labels, datasets: [{ label: 'Count', data: values,
+                backgroundColor: CHART_COLORS.slice(0, labels.length), borderRadius: 4 }] },
+            options: { indexAxis: 'y', responsive: true,
+                scales: { x: { beginAtZero: true, grid: { color: '#21262d' } }, y: { grid: { display: false } } },
+                plugins: { legend: { display: false } } }
+        });
+    }
+
+    function renderLicenseTable(data) {
+        var el = document.getElementById('license-table');
+        var alerts = data.license_abuse.alerts;
+        var cleanCount = data.license_abuse.clean_count;
+        var rows = '';
+        for (var i = 0; i < alerts.length; i++) {
+            var a = alerts[i];
+            rows += '<tr><td><span class="badge badge-' + a.severity.toLowerCase() + '">' + a.severity + '</span></td>' +
+                '<td>' + a.license_type + '</td><td style="color:' + COLORS.red + '">' + a.machine_count + '</td>' +
+                '<td>' + a.threshold + '</td></tr>';
+        }
+        if (cleanCount > 0) {
+            rows += '<tr><td><span class="badge badge-clean">OK</span></td>' +
+                '<td colspan="3">' + cleanCount + ' license(s) within threshold</td></tr>';
+        }
+        if (!rows) rows = '<tr><td colspan="4" style="color:var(--text-muted);text-align:center">No license data</td></tr>';
+        el.innerHTML = '<h3>License Status</h3><table><thead><tr><th>Status</th><th>Type</th><th>Machines</th><th>Threshold</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    function renderMachinesTable(data) {
+        var el = document.getElementById('machines-table');
+        var machines = data.machines || [];
+        var rows = '';
+        for (var i = 0; i < machines.length; i++) {
+            var m = machines[i];
+            var lastSeen = m.last_seen ? new Date(m.last_seen).toLocaleString('fr-FR') : '-';
+            rows += '<tr><td>' + m.os_version + '</td><td>' + m.app_version + '</td>' +
+                '<td>' + m.license_type + '</td><td>' + lastSeen + '</td></tr>';
+        }
+        if (!rows) rows = '<tr><td colspan="4" style="color:var(--text-muted);text-align:center">No machine data</td></tr>';
+        el.innerHTML = '<h3>Machines (' + machines.length + ')</h3><table><thead><tr><th>OS</th><th>Version</th><th>License</th><th>Last Seen</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    function renderErrorsTable(data) {
+        var el = document.getElementById('errors-table');
+        if (!el) return;
+        var rows = '';
+        for (var i = 0; i < data.top_errors.length; i++) {
+            rows += '<tr><td>' + data.top_errors[i].type + '</td><td>' + data.top_errors[i].count + '</td></tr>';
+        }
+        el.innerHTML = '<h3>Top Errors</h3><table><thead><tr><th>Error Type</th><th>Count</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    // Init
+    if (DASHBOARD_DATA) {
+        render(DASHBOARD_DATA);
+    } else {
+        document.getElementById('content').innerHTML = '<div class="empty-state">No data available. Dashboard will be populated by the next analytics run.</div>';
+    }
+    </script>
+</body>
+</html>
